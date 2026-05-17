@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0f172a">
+  <title>Claude Code Insights</title>
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="apple-touch-icon" href="/static/icon-192.svg">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface2: #334155;
+      --accent: #6366f1;
+      --accent2: #818cf8;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #eab308;
+      --text: #f1f5f9;
+      --text2: #94a3b8;
+      --radius: 16px;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      padding-top: var(--safe-top);
+      padding-bottom: calc(72px + var(--safe-bottom));
+      overflow-x: hidden;
+    }
+
+    /* Header */
+    .header {
+      padding: 20px 20px 16px;
+      background: linear-gradient(135deg, var(--accent) 0%, #4f46e5 100%);
+    }
+    .header h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+    .header p { font-size: 13px; opacity: 0.8; margin-top: 4px; }
+
+    /* Stats grid */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      padding: 16px 16px 0;
+      margin-top: -8px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 14px 12px;
+      text-align: center;
+      transition: transform 0.15s;
+    }
+    .stat-card:active { transform: scale(0.96); }
+    .stat-value { font-size: 24px; font-weight: 700; color: var(--accent2); }
+    .stat-label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 0;
+      padding: 16px 16px 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab {
+      flex: 1;
+      padding: 12px 8px;
+      text-align: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text2);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s;
+    }
+    .tab.active { color: var(--accent2); border-bottom-color: var(--accent); }
+
+    /* Panels */
+    .panel { display: none; padding: 16px; }
+    .panel.active { display: block; animation: fadeIn 0.25s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* Cards */
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+
+    /* Session items */
+    .session {
+      background: var(--surface);
+      border-radius: var(--radius);
+      margin-bottom: 10px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+    .session:active { transform: scale(0.98); }
+    .session-header {
+      padding: 14px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .session-prompt { font-size: 14px; font-weight: 500; flex: 1; margin-right: 8px; }
+    .session-time { font-size: 12px; color: var(--text2); white-space: nowrap; }
+    .session-body {
+      display: none;
+      padding: 0 16px 16px;
+      border-top: 1px solid var(--surface2);
+    }
+    .session.open .session-body { display: block; animation: fadeIn 0.2s ease; }
+    .session-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .meta-item {
+      background: var(--bg);
+      border-radius: 10px;
+      padding: 10px;
+      text-align: center;
+    }
+    .meta-value { font-size: 18px; font-weight: 700; color: var(--accent2); }
+    .meta-label { font-size: 11px; color: var(--text2); margin-top: 2px; }
+    .session-summary {
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: rgba(99,102,241,0.1);
+      border-radius: 10px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--text2);
+    }
+    .session-friction {
+      margin-top: 8px;
+      padding: 10px 12px;
+      background: rgba(239,68,68,0.1);
+      border-left: 3px solid var(--red);
+      border-radius: 0 10px 10px 0;
+      font-size: 13px;
+      color: #fca5a5;
+    }
+    .session-tools {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .tool-badge {
+      background: var(--accent);
+      color: white;
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+
+    /* Bar chart */
+    .bars { display: flex; align-items: flex-end; gap: 4px; height: 120px; padding-top: 8px; }
+    .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+    .bar {
+      width: 100%;
+      background: linear-gradient(180deg, var(--accent2), var(--accent));
+      border-radius: 4px 4px 0 0;
+      min-height: 2px;
+      transition: height 0.5s ease;
+    }
+    .bar-label { font-size: 9px; color: var(--text2); margin-top: 4px; }
+
+    /* Feature progress */
+    .feature-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 12px;
+      gap: 10px;
+    }
+    .feature-name { font-size: 13px; width: 90px; color: var(--text2); flex-shrink: 0; }
+    .feature-bar-bg {
+      flex: 1;
+      height: 10px;
+      background: var(--bg);
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    .feature-bar-fill {
+      height: 100%;
+      background: var(--green);
+      border-radius: 5px;
+      transition: width 0.8s ease;
+    }
+    .feature-pct { font-size: 13px; color: var(--text2); width: 40px; text-align: right; }
+
+    /* Outcome/friction pills */
+    .pill-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .pill {
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .pill-outcome { background: rgba(34,197,94,0.15); color: var(--green); }
+    .pill-friction { background: rgba(239,68,68,0.15); color: #fca5a5; }
+
+    /* Token section */
+    .token-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .token-card {
+      background: var(--bg);
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+    }
+    .token-card.full { grid-column: 1 / -1; }
+    .token-value { font-size: 22px; font-weight: 700; }
+    .token-value.in { color: var(--accent2); }
+    .token-value.out { color: var(--green); }
+    .token-value.total { color: var(--yellow); }
+    .token-label { font-size: 11px; color: var(--text2); margin-top: 4px; }
+
+    /* Bottom nav */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: calc(64px + var(--safe-bottom));
+      padding-bottom: var(--safe-bottom);
+      background: var(--surface);
+      border-top: 1px solid var(--surface2);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      z-index: 100;
+    }
+    .nav-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      background: none;
+      border: none;
+      color: var(--text2);
+      font-size: 10px;
+      font-weight: 500;
+      padding: 8px 16px;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .nav-btn.active { color: var(--accent2); }
+    .nav-btn svg { width: 22px; height: 22px; }
+
+    .empty { text-align: center; color: var(--text2); padding: 32px 16px; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Claude Code Insights</h1>
+  <p id="subtitle">Loading...</p>
+</div>
+
+<div class="stats" id="stats"></div>
+
+<div class="tabs" id="tabs">
+  <button class="tab active" data-tab="overview">Overview</button>
+  <button class="tab" data-tab="sessions">Sessions</button>
+  <button class="tab" data-tab="tokens">Tokens</button>
+  <button class="tab" data-tab="patterns">Patterns</button>
+</div>
+
+<div class="panel active" id="overview"></div>
+<div class="panel" id="sessions"></div>
+<div class="panel" id="tokens"></div>
+<div class="panel" id="patterns"></div>
+
+<nav class="bottom-nav">
+  <button class="nav-btn active" data-tab="overview">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    Overview
+  </button>
+  <button class="nav-btn" data-tab="sessions">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+    Sessions
+  </button>
+  <button class="nav-btn" data-tab="tokens">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+    Tokens
+  </button>
+  <button class="nav-btn" data-tab="patterns">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    Patterns
+  </button>
+</nav>
+
+<script>
+let DATA = null;
+
+async function load() {
+  const res = await fetch('/api/data');
+  DATA = await res.json();
+  render();
+}
+
+function fmt(n) { return n.toLocaleString('tr-TR'); }
+
+function timeStr(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }) + ' ' +
+           d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  } catch { return iso; }
+}
+
+function label(s) { return s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
+
+function render() {
+  const s = DATA.stats;
+  document.getElementById('subtitle').textContent =
+    `${s.sessions} oturum · ${s.messages} mesaj · ${s.hours}h`;
+
+  document.getElementById('stats').innerHTML = [
+    ['Sessions', s.sessions], ['Analyzed', s.analyzed], ['Messages', s.messages],
+    ['Hours', s.hours + 'h'], ['Commits', s.commits],
+    ['Tokens', fmt(s.input_tokens + s.output_tokens)]
+  ].map(([l, v]) => `<div class="stat-card"><div class="stat-value">${v}</div><div class="stat-label">${l}</div></div>`).join('');
+
+  renderOverview();
+  renderSessions();
+  renderTokens();
+  renderPatterns();
+}
+
+function renderOverview() {
+  let html = '';
+
+  // Outcomes
+  const outcomes = Object.entries(DATA.outcomes);
+  if (outcomes.length) {
+    html += `<div class="card"><div class="card-title">Oturum Sonuclari</div><div class="pill-list">`;
+    outcomes.forEach(([k, v]) => { html += `<span class="pill pill-outcome">${label(k)}: ${v}</span>`; });
+    html += `</div></div>`;
+  }
+
+  // Frictions
+  const frictions = Object.entries(DATA.frictions);
+  if (frictions.length) {
+    html += `<div class="card"><div class="card-title">Surtunme Noktalari</div><div class="pill-list">`;
+    frictions.forEach(([k, v]) => { html += `<span class="pill pill-friction">${label(k)}: ${v}</span>`; });
+    html += `</div></div>`;
+  }
+
+  // Categories
+  const cats = Object.entries(DATA.categories);
+  if (cats.length) {
+    html += `<div class="card"><div class="card-title">Hedef Kategorileri</div><div class="pill-list">`;
+    cats.forEach(([k, v]) => { html += `<span class="pill pill-outcome">${label(k)}: ${v}</span>`; });
+    html += `</div></div>`;
+  }
+
+  // Features
+  const features = Object.entries(DATA.features);
+  const total = DATA.stats.sessions || 1;
+  html += `<div class="card"><div class="card-title">Ozellik Kullanimi</div>`;
+  features.forEach(([name, count]) => {
+    const pct = Math.round(count / total * 100);
+    html += `<div class="feature-row">
+      <span class="feature-name">${name}</span>
+      <div class="feature-bar-bg"><div class="feature-bar-fill" style="width:${pct}%"></div></div>
+      <span class="feature-pct">${pct}%</span>
+    </div>`;
+  });
+  html += `</div>`;
+
+  document.getElementById('overview').innerHTML = html || '<div class="empty">Henuz veri yok</div>';
+}
+
+function renderSessions() {
+  const list = DATA.sessions;
+  if (!list.length) {
+    document.getElementById('sessions').innerHTML = '<div class="empty">Henuz oturum yok</div>';
+    return;
+  }
+  let html = '';
+  list.forEach((s, i) => {
+    const tools = Object.entries(s.tools || {});
+    html += `<div class="session" onclick="this.classList.toggle('open')">
+      <div class="session-header">
+        <span class="session-prompt">${s.prompt.substring(0, 50)}</span>
+        <span class="session-time">${timeStr(s.time)}</span>
+      </div>
+      <div class="session-body">
+        <div class="session-meta">
+          <div class="meta-item"><div class="meta-value">${s.duration}m</div><div class="meta-label">Sure</div></div>
+          <div class="meta-item"><div class="meta-value">${s.messages}</div><div class="meta-label">Mesaj</div></div>
+          <div class="meta-item"><div class="meta-value">${label(s.outcome)}</div><div class="meta-label">Sonuc</div></div>
+          <div class="meta-item"><div class="meta-value">${label(s.helpfulness)}</div><div class="meta-label">Yardim</div></div>
+        </div>
+        ${tools.length ? `<div class="session-tools">${tools.map(([t, c]) => `<span class="tool-badge">${t} x${c}</span>`).join('')}</div>` : ''}
+        ${s.summary ? `<div class="session-summary">${s.summary}</div>` : ''}
+        ${s.friction ? `<div class="session-friction">${s.friction}</div>` : ''}
+        <div class="session-meta" style="margin-top:8px">
+          <div class="meta-item"><div class="meta-value" style="font-size:14px">+${s.lines_added} / -${s.lines_removed}</div><div class="meta-label">Satir</div></div>
+          <div class="meta-item"><div class="meta-value" style="font-size:14px">${fmt(s.input_tokens + s.output_tokens)}</div><div class="meta-label">Token</div></div>
+        </div>
+      </div>
+    </div>`;
+  });
+  document.getElementById('sessions').innerHTML = html;
+}
+
+function renderTokens() {
+  const s = DATA.stats;
+  const tools = Object.entries(DATA.tools);
+
+  let html = `<div class="card"><div class="card-title">Token Kullanimi</div>
+    <div class="token-grid">
+      <div class="token-card"><div class="token-value in">${fmt(s.input_tokens)}</div><div class="token-label">Input</div></div>
+      <div class="token-card"><div class="token-value out">${fmt(s.output_tokens)}</div><div class="token-label">Output</div></div>
+      <div class="token-card full"><div class="token-value total">${fmt(s.input_tokens + s.output_tokens)}</div><div class="token-label">Toplam</div></div>
+    </div></div>`;
+
+  if (tools.length) {
+    const max = Math.max(...tools.map(t => t[1]));
+    html += `<div class="card"><div class="card-title">Arac Kullanimi</div><div class="bars">`;
+    tools.sort((a, b) => b[1] - a[1]);
+    tools.forEach(([name, count]) => {
+      const h = Math.max(8, (count / max) * 100);
+      html += `<div class="bar-col"><div class="bar" style="height:${h}%"></div><div class="bar-label">${name}</div></div>`;
+    });
+    html += `</div></div>`;
+  }
+
+  document.getElementById('tokens').innerHTML = html;
+}
+
+function renderPatterns() {
+  const hours = DATA.activity_hours;
+  const max = Math.max(...hours, 1);
+
+  let html = `<div class="card"><div class="card-title">Saatlik Aktivite</div><div class="bars">`;
+  hours.forEach((count, h) => {
+    const height = Math.max(2, (count / max) * 100);
+    html += `<div class="bar-col">
+      <div class="bar" style="height:${count ? height : 2}%;${count ? '' : 'opacity:0.2'}"></div>
+      <div class="bar-label">${h % 3 === 0 ? h.toString().padStart(2, '0') : ''}</div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
+  document.getElementById('patterns').innerHTML = html;
+}
+
+// Tab switching
+document.querySelectorAll('.tab, .nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    document.querySelectorAll('.nav-btn').forEach(n => n.classList.toggle('active', n.dataset.tab === tab));
+    document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === tab));
+  });
+});
+
+// Register service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/sw.js');
+}
+
+load();
+</script>
+</body>
+</html>
