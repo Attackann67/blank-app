@@ -14,7 +14,6 @@ Girdi:
   - SDM ekran görüntüleri (PNG/JPG)  → OCR ile alanlar çıkarılır
   - Tedarikçi PDF'leri               → metin katmanı varsa direkt,
                                        yoksa OCR (RapidOCR) ile okunur
-  - İsteğe bağlı manuel SDM alanları (OCR'ı doğrulamak/düzeltmek için)
 
 Kontroller:
   1. IBAN yapısal doğrulama (mod-97) + banka kodu ↔ banka adı
@@ -297,7 +296,7 @@ def karsilastir(sdm: dict, belgeler: list) -> list:
 
     # --- 1) SDM'deki IBAN'lar ---
     if not sdm["ibanlar"]:
-        ekle(WARN, "SDM IBAN", "SDM tarafında IBAN bulunamadı (ekran görüntüsü yükleyin veya manuel girin).")
+        ekle(WARN, "SDM IBAN", "SDM tarafında IBAN bulunamadı — ekran görüntüsünü kontrol edin.")
     for iban in sdm["ibanlar"]:
         p = iban_parcala(iban)
         mevcut = iban in guncel_set
@@ -402,13 +401,6 @@ with sol:
         type=["png", "jpg", "jpeg"],
         accept_multiple_files=True,
     )
-    with st.expander("✍️ Manuel SDM verisi (OCR yerine / OCR'a ek)"):
-        m_iban = st.text_input("Yeni IBAN", placeholder="TR17 0006 2000 1210 0009 0818 23")
-        m_hesap = st.text_input("Banka Hesabı", placeholder="9081823")
-        m_anahtar = st.text_input("Banka anahtarı", placeholder="062-0121")
-        m_pb = st.text_input("Para birimi (Bn.Tp)", placeholder="USD")
-        m_vkn = st.text_input("Vergi No", placeholder="1230037647")
-        m_unvan = st.text_input("Hesap sahibi / Unvan", placeholder="AYSA DENİZCİLİK ... A.Ş.")
 
 with sag:
     st.subheader("2️⃣ Tedarikçi belgeleri (PDF)")
@@ -422,33 +414,17 @@ if st.button("🔍 Karşılaştır ve farkları yakala", type="primary", use_con
     if not pdf_dosyalar:
         st.error("En az bir PDF belgesi yükleyin.")
         st.stop()
-    if not ss_dosyalar and not any([m_iban, m_hesap, m_anahtar, m_vkn, m_unvan]):
-        st.error("SDM tarafı için ekran görüntüsü yükleyin ya da manuel veri girin.")
+    if not ss_dosyalar:
+        st.error("SDM ekran görüntüsü yükleyin.")
         st.stop()
 
     # --- SDM tarafını oku ---
     sdm_metin = ""
-    for f in ss_dosyalar or []:
+    for f in ss_dosyalar:
         with st.spinner(f"OCR: {f.name}"):
             sdm_metin += "\n" + resim_metni_oku(f.name, f.getvalue())
     sdm = alanlari_cikar(sdm_metin, "SDM ekranı")
     sdm["guncel_ibanlar"], sdm["yeni_ibanlar"] = sdm_bolumle(sdm_metin)
-
-    # manuel girişleri birleştir
-    if m_iban:
-        i = clean_iban(m_iban)
-        if i not in sdm["ibanlar"]:
-            sdm["ibanlar"].append(i)
-    if m_hesap:
-        sdm["hesap_no"] = [re.sub(r"\D", "", m_hesap)] + sdm["hesap_no"]
-    if m_anahtar and m_anahtar not in sdm["banka_anahtarlari"]:
-        sdm["banka_anahtarlari"].append(m_anahtar.strip())
-    if m_pb:
-        sdm["para_birimleri"] = list(dict.fromkeys([m_pb.strip().upper()] + sdm["para_birimleri"]))
-    if m_vkn:
-        sdm["vergi_no"] = list(dict.fromkeys([re.sub(r"\D", "", m_vkn)] + sdm["vergi_no"]))
-    if m_unvan:
-        sdm["unvanlar"] = [normalize_text(m_unvan)] + sdm["unvanlar"]
 
     # --- Belgeleri oku ---
     belgeler = []

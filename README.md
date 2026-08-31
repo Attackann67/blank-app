@@ -31,7 +31,7 @@ $ streamlit run sdm_dashboard.py
 **Nasıl çalışır?**
 
 1. SDM ekran görüntülerini (PNG/JPG) yükleyin — Güncel/Yeni Veriler
-   bölümleri OCR ile okunur (isterseniz alanları manuel de girebilirsiniz).
+   bölümleri OCR ile okunur.
 2. Tedarikçi PDF'lerini yükleyin (banka bilgisi deklarasyonu, tedarikçi
    bilgi formu, banka hesap cüzdanı, vergi levhası). Metin katmanı olmayan
    taranmış PDF'ler otomatik OCR'lanır (RapidOCR — harici kurulum gerekmez).
