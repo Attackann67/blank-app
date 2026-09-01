@@ -20,6 +20,10 @@ A simple Streamlit app template for you to modify!
 
 ## 🏦 SDM Kontrol Dashboard'u
 
+**Streamlit Cloud'a tek tıkla kur:**
+[share.streamlit.io/deploy](https://share.streamlit.io/deploy?repository=Attackann67%2Fblank-app&branch=claude%2Fsdm-dashboard-pdf-comparison-tw3gzq&mainModule=sdm_dashboard.py)
+(GitHub hesabınla giriş yap → Deploy — form önceden doldurulmuş gelir.)
+
 SDM "Banka Bilgileri Değişikliği" taleplerini tedarikçi belgeleriyle
 karşılaştırıp farkları yakalayan dashboard: `sdm_dashboard.py`
 
