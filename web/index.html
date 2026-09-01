@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SDM Kontrol Paneli</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏦</text></svg>">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* Tek tema: koyu "güvenlik baskısı" konsolu */
+  :root{
+    --ink0:#0A1118; --ink1:#101B26; --ink2:#152331; --ink3:#1B2C3D;
+    --line:#24384C; --line-soft:#1C2E3F;
+    --text:#EAF1F7; --muted:#8CA2B6; --faint:#5E7488;
+    --gold:#DDB868; --gold-ink:#171207;
+    --guillo:#33506C;
+    --ok:#57C88F; --ok-bg:#10281D; --ok-line:#1E4A35;
+    --warn:#E08A3C; --warn-bg:#2C1E0C; --warn-line:#573A17;
+    --fail:#F07567; --fail-bg:#301412; --fail-line:#5C2521;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  body{
+    background:var(--ink0); color:var(--text); margin:0;
+    font-family:"Schibsted Grotesk",system-ui,-apple-system,sans-serif;
+    font-size:15.5px; line-height:1.55; -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--gold); color:var(--gold-ink)}
+  .mono,code{font-family:"IBM Plex Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums}
+
+  .hero{position:relative; overflow:hidden; border-bottom:1px solid var(--line-soft);
+    background:linear-gradient(180deg,#0C1520 0%,var(--ink0) 100%)}
+  .hero canvas{position:absolute; inset:0; width:100%; height:100%; opacity:.55}
+  .hero .in{position:relative; max-width:1100px; margin:0 auto; padding:64px 24px 56px}
+  .kicker{display:inline-flex; align-items:center; gap:10px; font-size:12px; font-weight:600;
+    letter-spacing:.22em; text-transform:uppercase; color:var(--muted); margin-bottom:18px}
+  .kicker::before{content:""; width:34px; height:1px; background:var(--gold)}
+  h1{font-size:clamp(34px,5.4vw,58px); font-weight:800; letter-spacing:-.025em;
+    line-height:1.04; margin:0 0 18px; text-wrap:balance; max-width:16ch}
+  h1 em{font-style:normal; color:var(--gold)}
+  .hero p{color:var(--muted); max-width:58ch; margin:0; font-size:16px}
+  .hero .meta{display:flex; gap:22px; flex-wrap:wrap; margin-top:26px; font-size:13px; color:var(--faint)}
+  .hero .meta span{display:inline-flex; gap:7px; align-items:center}
+  .hero .meta b{color:var(--muted); font-weight:600}
+
+  .wrap{max-width:1100px; margin:0 auto; padding:40px 24px 90px}
+
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:20px}
+  @media(max-width:780px){.grid2{grid-template-columns:1fr}}
+  .panel{background:var(--ink1); border:1px solid var(--line-soft); border-radius:14px; padding:22px}
+  .panel h2{display:flex; align-items:baseline; gap:12px; font-size:17px; font-weight:700;
+    letter-spacing:-.01em; margin:0 0 4px}
+  .panel h2 .no{font-family:"IBM Plex Mono",monospace; font-size:12px; font-weight:600;
+    color:var(--gold); letter-spacing:.1em}
+  .panel .hint{font-size:13.5px; color:var(--muted); margin:0 0 16px; max-width:52ch}
+  .drop{position:relative; padding:30px 18px; text-align:center; color:var(--muted);
+    font-size:14px; cursor:pointer; border-radius:8px; background:var(--ink2);
+    transition:background .18s,color .18s; user-select:none}
+  .drop::before,.drop::after,.drop .c::before,.drop .c::after{
+    content:""; position:absolute; width:16px; height:16px; border:2px solid var(--faint);
+    transition:border-color .18s}
+  .drop::before{top:8px; left:8px; border-right:none; border-bottom:none}
+  .drop::after{top:8px; right:8px; border-left:none; border-bottom:none}
+  .drop .c::before{bottom:8px; left:8px; border-right:none; border-top:none}
+  .drop .c::after{bottom:8px; right:8px; border-left:none; border-top:none}
+  .drop:hover,.drop.over,.drop:focus-visible{background:var(--ink3); color:var(--text); outline:none}
+  .drop:hover::before,.drop:hover::after,.drop:hover .c::before,.drop:hover .c::after,
+  .drop.over::before,.drop.over::after,.drop.over .c::before,.drop.over .c::after,
+  .drop:focus-visible::before,.drop:focus-visible::after{border-color:var(--gold)}
+  .drop .big{display:block; font-size:15px; font-weight:600; color:var(--text); margin-bottom:3px}
+  .filelist{list-style:none; margin:14px 0 0; padding:0; display:flex; flex-direction:column; gap:7px}
+  .filelist li{display:flex; align-items:center; gap:10px; font-size:13.5px;
+    background:var(--ink2); border:1px solid var(--line-soft); border-radius:8px; padding:8px 12px}
+  .filelist .dot{width:7px; height:7px; border-radius:50%; background:var(--gold); flex:none}
+  .filelist .fname{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .filelist .fmeta{color:var(--faint); font-size:12px; flex:none}
+  .filelist button{border:none; background:none; color:var(--faint); cursor:pointer;
+    font-size:15px; padding:2px 5px; border-radius:5px; line-height:1}
+  .filelist button:hover{color:var(--fail); background:var(--fail-bg)}
+
+  .actions{display:flex; gap:14px; align-items:center; margin:28px 0 6px; flex-wrap:wrap}
+  .btn{font:inherit; font-weight:700; border:none; border-radius:10px; padding:14px 28px;
+    cursor:pointer; letter-spacing:.01em; text-decoration:none; display:inline-block}
+  .btn:focus-visible{outline:2px solid var(--gold); outline-offset:3px}
+  .btn-primary{background:var(--gold); color:var(--gold-ink); box-shadow:0 6px 24px rgba(221,184,104,.22)}
+  .btn-primary:hover{filter:brightness(1.07)}
+  .btn-primary:disabled{opacity:.45; cursor:default; box-shadow:none}
+  .btn-ghost{background:transparent; color:var(--muted); border:1px solid var(--line)}
+  .btn-ghost:hover{color:var(--text); border-color:var(--muted)}
+  .note{font-size:13.5px; color:var(--muted); max-width:60ch}
+  .note.err{color:var(--fail)}
+
+  #progress{display:none; margin:18px 0 8px; border-left:2px solid var(--line); padding-left:16px}
+  #progress.show{display:block}
+  #progress ul{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px}
+  #progress li{font-size:13.5px; color:var(--faint); font-family:"IBM Plex Mono",monospace}
+  #progress li.done{color:var(--ok)}
+  #progress li.active{color:var(--text)}
+  #progress li.active::after{content:" ▉"; animation:blink 1s steps(2) infinite}
+  @keyframes blink{50%{opacity:0}}
+  @media(prefers-reduced-motion:reduce){#progress li.active::after{animation:none}}
+
+  #results{display:none; margin-top:34px}
+  #results.show{display:block}
+  .verdictRow{display:grid; grid-template-columns:auto 1fr; gap:28px; align-items:center;
+    background:var(--ink1); border:1px solid var(--line-soft); border-radius:16px; padding:26px 30px}
+  @media(max-width:640px){.verdictRow{grid-template-columns:1fr; justify-items:center; text-align:center}}
+  .stamp{--sc:var(--ok); transform:rotate(-7deg); border:3px solid var(--sc); border-radius:10px;
+    padding:10px 20px 12px; position:relative; color:var(--sc); text-align:center; flex:none}
+  .stamp::before{content:""; position:absolute; inset:4px; border:1.5px solid var(--sc);
+    border-radius:6px; opacity:.65}
+  .stamp .s1{font-size:11px; font-weight:700; letter-spacing:.3em; text-transform:uppercase; opacity:.8}
+  .stamp .s2{font-size:26px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; line-height:1.1}
+  .stamp.warn{--sc:var(--warn)} .stamp.fail{--sc:var(--fail)}
+  .verdictRow .vtext{font-size:16px; max-width:52ch}
+  .verdictRow .vtext b{font-weight:700}
+  .verdictRow .vsub{color:var(--muted); font-size:13.5px; margin-top:6px}
+
+  .tiles{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:20px 0 8px}
+  @media(max-width:680px){.tiles{grid-template-columns:repeat(2,1fr)}}
+  .tile{background:var(--ink1); border:1px solid var(--line-soft); border-radius:12px;
+    padding:16px 18px; position:relative; overflow:hidden}
+  .tile::before{content:""; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--line)}
+  .tile.t-ok::before{background:var(--ok)} .tile.t-warn::before{background:var(--warn)}
+  .tile.t-fail::before{background:var(--fail)}
+  .tile .n{font-family:"IBM Plex Mono",monospace; font-size:30px; font-weight:600; line-height:1.1}
+  .tile.t-ok .n{color:var(--ok)} .tile.t-warn .n{color:var(--warn)} .tile.t-fail .n{color:var(--fail)}
+  .tile .l{font-size:11.5px; font-weight:600; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--faint); margin-top:3px}
+
+  h3.sec{display:flex; align-items:center; gap:14px; font-size:12.5px; font-weight:700;
+    letter-spacing:.2em; text-transform:uppercase; color:var(--muted); margin:36px 0 14px}
+  h3.sec::after{content:""; flex:1; height:1px; background:var(--line-soft)}
+
+  .findings{display:flex; flex-direction:column; gap:9px}
+  .finding{display:grid; grid-template-columns:auto 1fr; gap:14px; align-items:start;
+    border:1px solid var(--line-soft); border-radius:10px; padding:12px 16px; background:var(--ink1)}
+  .finding .tag{font-family:"IBM Plex Mono",monospace; font-size:11px; font-weight:600;
+    letter-spacing:.06em; padding:3px 9px; border-radius:5px; border:1px solid; white-space:nowrap; margin-top:2px}
+  .finding.ok .tag{color:var(--ok); border-color:var(--ok-line); background:var(--ok-bg)}
+  .finding.warn .tag{color:var(--warn); border-color:var(--warn-line); background:var(--warn-bg)}
+  .finding.fail .tag{color:var(--fail); border-color:var(--fail-line); background:var(--fail-bg)}
+  .finding.fail{border-color:var(--fail-line)}
+  .finding .body{font-size:14.5px}
+  .finding .body .k{font-weight:700}
+  .finding .body .mono{font-size:.9em; color:var(--text)}
+
+  .tablewrap{overflow-x:auto; border:1px solid var(--line-soft); border-radius:12px; background:var(--ink1)}
+  table{border-collapse:collapse; width:100%; font-size:14px; min-width:580px}
+  th{font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--faint);
+    text-align:left; padding:11px 16px; border-bottom:1px solid var(--line-soft); background:var(--ink2)}
+  td{padding:11px 16px; border-bottom:1px solid var(--line-soft); vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.alan{color:var(--muted); font-weight:600; white-space:nowrap}
+
+  details.doc{background:var(--ink1); border:1px solid var(--line-soft); border-radius:12px;
+    margin-bottom:9px; overflow:hidden}
+  details.doc summary{cursor:pointer; padding:13px 18px; font-weight:600; font-size:14.5px;
+    user-select:none; display:flex; gap:10px; align-items:baseline; list-style:none}
+  details.doc summary::before{content:"+"; font-family:"IBM Plex Mono",monospace;
+    color:var(--gold); font-weight:600}
+  details.doc[open] summary::before{content:"−"}
+  details.doc summary .m{font-weight:400; color:var(--faint); font-size:13px}
+  details.doc .inner{padding:2px 18px 18px; border-top:1px solid var(--line-soft)}
+  .kv{margin:8px 0 0; font-size:13.5px}
+  .kv dt{font-weight:700; color:var(--faint); font-size:11px; text-transform:uppercase;
+    letter-spacing:.14em; margin-top:12px}
+  .kv dd{margin:4px 0 0; line-height:1.7}
+  .kv textarea{width:100%; min-height:140px; background:var(--ink0); color:var(--muted);
+    border:1px solid var(--line-soft); border-radius:8px; padding:10px;
+    font-family:"IBM Plex Mono",monospace; font-size:12px}
+
+  footer{margin-top:56px; font-size:13px; color:var(--faint); border-top:1px solid var(--line-soft);
+    padding-top:18px; max-width:72ch}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <canvas id="guillo" aria-hidden="true"></canvas>
+  <div class="in">
+    <div class="kicker">SDM Ekranı Kontrol</div>
+    <h1>Belgeyle ekran arasındaki <em>farkı</em> yakala.</h1>
+    <p>SDM ekranındaki verileri tedarikçinin gönderdiği belgelerle karşılaştırır;
+    IBAN, hesap no, banka anahtarı, para birimi, vergi no ve unvan uyuşmazlıklarını onaydan önce ortaya çıkarır.
+    Tüm işlem tarayıcınızda yapılır — dosyalar hiçbir sunucuya gönderilmez.</p>
+    <div class="meta">
+      <span><b>7</b> otomatik kontrol</span>
+      <span><b>mod-97</b> IBAN doğrulama</span>
+      <span>OCR tarayıcı içinde çalışır</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="grid2">
+    <section class="panel">
+      <h2><span class="no">01</span> SDM ekranı</h2>
+      <p class="hint">Kontrol edilecek SDM ekranının görüntüleri — Güncel / Yeni Veriler bölümleri varsa ayrım otomatik yapılır</p>
+      <div class="drop" id="dropSS" tabindex="0" role="button" aria-label="SDM ekran görüntüsü seç">
+        <span class="c"></span>
+        <span class="big">Ekran görüntülerini bırakın</span>
+        ya da tıklayıp seçin — PNG · JPG
+      </div>
+      <input type="file" id="fileSS" accept="image/png,image/jpeg,image/webp" multiple hidden>
+      <ul class="filelist" id="listSS"></ul>
+    </section>
+
+    <section class="panel">
+      <h2><span class="no">02</span> Tedarikçi belgeleri</h2>
+      <p class="hint">Banka deklarasyonu, tedarikçi bilgi formu, hesap cüzdanı, vergi levhası</p>
+      <div class="drop" id="dropDoc" tabindex="0" role="button" aria-label="Belge seç">
+        <span class="c"></span>
+        <span class="big">Belgeleri bırakın</span>
+        ya da tıklayıp seçin — PDF · görüntü
+      </div>
+      <input type="file" id="fileDoc" accept="application/pdf,image/png,image/jpeg,image/webp" multiple hidden>
+      <ul class="filelist" id="listDoc"></ul>
+    </section>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" id="btnRun">Doğrulamayı başlat</button>
+    <button class="btn btn-ghost" id="btnStop" hidden>Durdur</button>
+    <span class="note" id="statusNote"></span>
+  </div>
+
+  <div id="progress"><ul id="progressList"></ul></div>
+
+  <section id="results" aria-live="polite">
+    <div class="verdictRow">
+      <div class="stamp" id="stamp">
+        <div class="s1">SDM Kontrol</div>
+        <div class="s2" id="stampText">UYUMLU</div>
+      </div>
+      <div>
+        <div class="vtext" id="verdictText"></div>
+        <div class="vsub" id="verdictSub"></div>
+      </div>
+    </div>
+
+    <div class="tiles">
+      <div class="tile t-ok"><div class="n" id="nOk">0</div><div class="l">Uyumlu</div></div>
+      <div class="tile t-warn"><div class="n" id="nWarn">0</div><div class="l">Kontrol edilecek</div></div>
+      <div class="tile t-fail"><div class="n" id="nFail">0</div><div class="l">Uyumsuz</div></div>
+      <div class="tile"><div class="n mono" id="nTalep">—</div><div class="l">Talep no</div></div>
+    </div>
+
+    <h3 class="sec">Kontrol sonuçları</h3>
+    <div class="findings" id="findings"></div>
+
+    <h3 class="sec">Alan bazında karşılaştırma</h3>
+    <div class="tablewrap">
+      <table id="fieldTable">
+        <thead><tr><th>Alan</th><th>SDM ekranı</th><th>Belgeler</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <h3 class="sec">Belge detayları</h3>
+    <div id="docDetails"></div>
+
+    <div class="actions">
+      <a class="btn btn-ghost" id="btnReport" hidden download="sdm_kontrol.txt">Raporu indir (.txt)</a>
+    </div>
+  </section>
+
+  <footer>
+    Bu panel bir ön kontrol aracıdır: sonuçlar OCR çıktısına dayanır ve hatalı okunmuş olabilir.
+    Talebi onaylamadan önce kritik alanları belge asıllarından doğrulayın.
+    OCR (Tesseract) ve PDF işleme tamamen tarayıcınızda çalışır; dosyalarınız bilgisayarınızdan çıkmaz.
+    İlk çalıştırmada OCR motoru ve Türkçe dil paketi indirilir (~15 MB), sonrası hızlıdır.
+  </footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script>
+"use strict";
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+
+/* ========================= giyoş deseni (hero) =========================== */
+(() => {
+  const cv = document.getElementById("guillo");
+  const ctx = cv.getContext("2d");
+  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let W, H, t = 0, raf = null;
+  function size() {
+    const r = cv.parentElement.getBoundingClientRect();
+    const dpr = Math.min(2, devicePixelRatio || 1);
+    W = r.width; H = r.height;
+    cv.width = W * dpr; cv.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    const cx = W * 0.82, cy = H * 0.42, R = Math.min(W, H) * 0.62;
+    ctx.lineWidth = 0.7;
+    for (let i = 0; i < 26; i++) {
+      const a = 3 + (i % 5), b = 0.16 + i * 0.012, ph = t * (0.12 + (i % 7) * 0.018) + i * 0.6;
+      ctx.strokeStyle = "rgba(51,80,108," + (0.10 + (i % 4) * 0.05) + ")";
+      ctx.beginPath();
+      for (let s = 0; s <= 260; s++) {
+        const u = (s / 260) * Math.PI * 2;
+        const rad = R * (0.42 + b * Math.sin(a * u + ph) + 0.08 * Math.sin(2 * u - ph * 0.7));
+        const x = cx + rad * Math.cos(u), y = cy + rad * Math.sin(u) * 0.86;
+        s ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      ctx.closePath(); ctx.stroke();
+    }
+  }
+  function loop() { t += 0.012; draw(); raf = requestAnimationFrame(loop); }
+  size(); draw();
+  addEventListener("resize", () => { size(); draw(); });
+  if (!reduced) raf = requestAnimationFrame(loop);
+  document.addEventListener("visibilitychange", () => {
+    if (reduced) return;
+    if (document.hidden) { cancelAnimationFrame(raf); raf = null; }
+    else if (!raf) raf = requestAnimationFrame(loop);
+  });
+})();
+
+/* ============================== durum ==================================== */
+const state = { ssFiles: [], docFiles: [], running: false, cancelled: false };
+let ocrWorker = null, reportUrl = null;
+
+/* ============================ dosya seçimi =============================== */
+function bindPicker(dropId, inputId, listId, store) {
+  const drop = document.getElementById(dropId);
+  const input = document.getElementById(inputId);
+  const list = document.getElementById(listId);
+  const render = () => {
+    list.replaceChildren(...store.map((f, i) => {
+      const li = document.createElement("li");
+      const dot = document.createElement("span"); dot.className = "dot";
+      const name = document.createElement("span");
+      name.className = "fname"; name.textContent = f.name; name.title = f.name;
+      const meta = document.createElement("span");
+      meta.className = "fmeta mono"; meta.textContent = (f.size / 1024).toFixed(0) + " KB";
+      const del = document.createElement("button");
+      del.type = "button"; del.textContent = "✕"; del.setAttribute("aria-label", f.name + " kaldır");
+      del.onclick = () => { store.splice(i, 1); render(); };
+      li.append(dot, name, meta, del);
+      return li;
+    }));
+  };
+  const add = files => {
+    for (const f of files) {
+      if (f.size === 0) { setNote(f.name + " boş bir dosya (0 KB) — eklenmedi.", true); continue; }
+      if (!store.some(g => g.name === f.name && g.size === f.size)) store.push(f);
+    }
+    render();
+  };
+  drop.onclick = () => input.click();
+  drop.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); } };
+  input.onchange = () => { add(input.files); input.value = ""; };
+  drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+  drop.ondragleave = () => drop.classList.remove("over");
+  drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); add(e.dataTransfer.files); };
+}
+bindPicker("dropSS", "fileSS", "listSS", state.ssFiles);
+bindPicker("dropDoc", "fileDoc", "listDoc", state.docFiles);
+
+/* ====================== metin normalizasyonu / IBAN ====================== */
+const TR_BANKA = {
+  "00001":"T.C. Merkez Bankası","00010":"Ziraat Bankası","00012":"Halkbank","00015":"VakıfBank",
+  "00032":"TEB","00046":"Akbank","00059":"Şekerbank","00062":"Garanti BBVA","00064":"İş Bankası",
+  "00067":"Yapı Kredi","00099":"ING","00103":"Fibabanka","00111":"QNB","00123":"HSBC",
+  "00124":"Alternatif Bank","00134":"DenizBank","00146":"Odeabank","00203":"Albaraka Türk",
+  "00205":"Kuveyt Türk","00206":"Türkiye Finans","00209":"Ziraat Katılım","00210":"Vakıf Katılım",
+  "00211":"Emlak Katılım"
+};
+const PB_LIST = ["USD","EUR","GBP","TRY","TL","CHF","JPY","CNY","SEK"];
+
+const normTxt = s => (s || "").toUpperCase()
+  .replace(/İ/g,"I").replace(/Ş/g,"S").replace(/Ğ/g,"G").replace(/Ü/g,"U")
+  .replace(/Ö/g,"O").replace(/Ç/g,"C").replace(/Â/g,"A").replace(/\s+/g," ").trim();
+const fixDigits = s => (s || "").replace(/[OoİIl]/g, c => ({O:"0",o:"0","İ":"1",I:"1",l:"1"}[c]));
+const cleanIban = s => {
+  s = (s || "").toUpperCase().replace(/[\s\-.·]/g, "");
+  return s.startsWith("TR") ? "TR" + fixDigits(s.slice(2)) : s;
+};
+const fmtIban = s => (cleanIban(s).match(/.{1,4}/g) || []).join(" ");
+function ibanValid(iban) {
+  iban = cleanIban(iban);
+  if (!/^TR\d{24}$/.test(iban)) return false;
+  const num = (iban.slice(4) + iban.slice(0, 4)).replace(/[A-Z]/g, c => String(c.charCodeAt(0) - 55));
+  return BigInt(num) % 97n === 1n;
+}
+const ibanParse = iban => {
+  iban = cleanIban(iban);
+  if (!/^TR\d{24}$/.test(iban)) return null;
+  const kod = iban.slice(4, 9);
+  return { iban, bankaKodu: kod, bankaAdi: TR_BANKA[kod] || "Bilinmiyor",
+           hesapAlani: iban.slice(10), gecerli: ibanValid(iban) };
+};
+const IBAN_RE = /TR[\s\-.]?((?:[0-9OIl][\s\-.]?){24})/g;
+function findIbans(text) {
+  const out = [];
+  for (const m of fixDigits(text || "").matchAll(IBAN_RE)) {
+    const iban = cleanIban("TR" + m[1]);
+    if (iban.length === 26 && !out.includes(iban)) out.push(iban);
+  }
+  return out;
+}
+function findVkn(text) {
+  const t = fixDigits(text || ""); const out = [];
+  for (const m of t.matchAll(/(?:verg|tax|vkn|v\.?d\.?)[^\n]{0,80}?(\d[\d\s]{8,14}\d)/gi)) {
+    const c = m[1].replace(/\s/g, "");
+    if (c.length === 10 && !out.includes(c)) out.push(c);
+  }
+  if (out.length) return out;
+  // ipucu kelimesi yoksa: bağımsız 10 haneli sayılar (vergi levhası düzeni)
+  return [...new Set([...t.matchAll(/(?<!\d)(\d{10})(?!\d)/g)].map(m => m[1]))];
+}
+const findPb = text => { const t = normTxt(text); return PB_LIST.filter(p => new RegExp("(?<![A-Z])" + p + "(?![A-Z])").test(t)); };
+const findTalepNo = text => (text.match(/talep\s*no\s*[:.]?\s*(\d{3,10})/i) || [])[1] || null;
+const findAnahtar = text => [...new Set([...fixDigits(text || "").matchAll(/(?<!\d)(\d{3}-\d{4})(?!\d)/g)].map(m => m[1]))];
+function findHesapNo(text, ibanlar) {
+  const t = fixDigits(text || "");
+  const adaylar = [...new Set([...t.matchAll(/(?<!\d)(\d{5,9})(?!\d)/g)].map(m => m[1]))];
+  const ibanIci = adaylar.filter(a => ibanlar.some(i => i.slice(10).includes(a)));
+  return ibanIci.length ? ibanIci : adaylar.slice(0, 10);
+}
+function findUnvan(text) {
+  const out = [];
+  for (const satir of (text || "").split("\n")) {
+    let n = normTxt(satir);
+    if (/\b(A\.?S\.?|LTD|SAN|TIC|ANONIM|SIRKETI)\b/.test(n) && n.length > 12) {
+      n = n.replace(/^(HESAP SAHIBI|ACCOUNT HOLDER|TICARET UNVANI)\s*[:.]?\s*/, "");
+      if (!out.includes(n)) out.push(n);
+    }
+  }
+  return out;
+}
+function sdmBolumle(text) {
+  const n = normTxt((text || "").replace(/\n/g, " ⏎ "));
+  const m = n.match(/YEN[I1]\s*VER[I1]LER/);
+  if (!m) return { guncel: [], yeni: findIbans(text) };
+  const guncel = findIbans(n.slice(0, m.index));
+  const yeni = findIbans(n.slice(m.index)).filter(i => !guncel.includes(i));
+  return { guncel, yeni };
+}
+const uniq = a => [...new Set(a.filter(Boolean))];
+function sim(a, b) { // basit benzerlik: ortak bigram oranı
+  a = normTxt(a).replace(/[^A-Z0-9]/g, ""); b = normTxt(b).replace(/[^A-Z0-9]/g, "");
+  if (!a || !b) return 0;
+  const grams = s => { const g = new Map(); for (let i = 0; i < s.length - 1; i++) { const k = s.slice(i, i + 2); g.set(k, (g.get(k) || 0) + 1); } return g; };
+  const ga = grams(a), gb = grams(b); let inter = 0, tot = 0;
+  for (const [k, v] of ga) { tot += v; if (gb.has(k)) inter += Math.min(v, gb.get(k)); }
+  for (const v of gb.values()) tot += v;
+  return tot ? (2 * inter) / tot : 0;
+}
+
+/* ====================== OCR + PDF/görüntü işleme ========================= */
+async function getWorker(onStatus) {
+  if (ocrWorker) return ocrWorker;
+  onStatus?.("OCR motoru indiriliyor (ilk sefer ~15 MB)");
+  ocrWorker = await Tesseract.createWorker("tur+eng");
+  return ocrWorker;
+}
+async function ocr(imgLike, onPct) {
+  const w = await getWorker();
+  const { data } = await w.recognize(imgLike);
+  onPct?.(100);
+  return data.text || "";
+}
+async function fileToCanvas(file, maxSide = 2000) {
+  const img = await createImageBitmap(file);
+  const scale = Math.min(1.6, maxSide / Math.max(img.width, img.height));
+  const c = document.createElement("canvas");
+  c.width = Math.round(img.width * Math.max(1, scale));
+  c.height = Math.round(img.height * Math.max(1, scale));
+  c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+  return c;
+}
+/* PDF: metin katmanı varsa doğrudan, yoksa sayfayı çizip OCR */
+async function pdfToText(file, prog) {
+  const data = new Uint8Array(await file.arrayBuffer());
+  const doc = await pdfjsLib.getDocument({ data }).promise;
+  const parts = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    if (state.cancelled) throw { code: "cancelled" };
+    prog?.(`sayfa ${i}/${doc.numPages}`);
+    const page = await doc.getPage(i);
+    let text = "";
+    try {
+      const tc = await page.getTextContent();
+      text = tc.items.map(it => it.str).join(" ").trim();
+    } catch (_) {}
+    if (text.length < 60) {
+      const vp1 = page.getViewport({ scale: 1 });
+      const scale = Math.min(2.6, 1800 / Math.max(vp1.width, vp1.height));
+      const vp = page.getViewport({ scale });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(vp.width); canvas.height = Math.round(vp.height);
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+      prog?.(`sayfa ${i}/${doc.numPages} OCR`);
+      text = await ocr(canvas);
+    }
+    parts.push(text);
+  }
+  return parts.join("\n");
+}
+
+function alanlariCikar(text, kaynak) {
+  const ibanlar = findIbans(text);
+  return {
+    kaynak, ibanlar,
+    vergiNo: findVkn(text),
+    paraBirimleri: findPb(text),
+    hesapNo: findHesapNo(text, ibanlar),
+    bankaAnahtarlari: findAnahtar(text),
+    unvanlar: findUnvan(text),
+    metin: text
+  };
+}
+
+/* ============================ karşılaştırma ============================== */
+function karsilastir(sdm, belgeler) {
+  const B = [];
+  const push = (durum, kontrol, detay) => B.push({ durum, kontrol, detay });
+  const guncelSet = new Set(sdm.guncelIbanlar);
+  const tumIbanlar = uniq([...sdm.guncelIbanlar, ...sdm.yeniIbanlar]);
+
+  if (!tumIbanlar.length)
+    push("warn", "SDM IBAN", "SDM tarafında IBAN bulunamadı — ekran görüntüsünün net olduğundan emin olun.");
+
+  for (const iban of tumIbanlar) {
+    const p = ibanParse(iban);
+    const mevcut = guncelSet.has(iban);
+    const etiket = mevcut ? "mevcut kayıt" : "YENİ eklenen";
+    if (p && p.gecerli)
+      push("ok", "IBAN mod-97", `<span class="mono">${fmtIban(iban)}</span> (${etiket}) yapısal olarak geçerli — ${p.bankaAdi}.`);
+    else
+      push("fail", "IBAN mod-97", `<span class="mono">${fmtIban(iban)}</span> GEÇERSİZ — kontrol basamağı tutmuyor (OCR hatası ya da sahte IBAN olabilir).`);
+
+    const gecen = belgeler.filter(b => b.ibanlar.includes(iban)).map(b => b.kaynak);
+    if (gecen.length)
+      push(gecen.length >= 2 ? "ok" : "warn", "IBAN belge teyidi",
+        `<span class="mono">${fmtIban(iban)}</span> (${etiket}) şu belgelerde geçiyor: ${gecen.join(", ")}` +
+        (gecen.length >= 2 ? "." : " — yalnızca TEK belgede; ikinci bir kaynakla teyit edin."));
+    else if (mevcut)
+      push("warn", "IBAN belge teyidi", `<span class="mono">${fmtIban(iban)}</span> mevcut (güncel) kayıt — belgelerde geçmiyor; değişiklik kapsamında değilse sorun değil.`);
+    else
+      push("fail", "IBAN belge teyidi", `<span class="mono">${fmtIban(iban)}</span> YENİ eklenen IBAN HİÇBİR belgede bulunamadı!`);
+
+    for (const hn of sdm.hesapNo)
+      if (p && p.hesapAlani.includes(hn)) {
+        push("ok", "Hesap no ↔ IBAN", `Hesap no <span class="mono">${hn}</span>, IBAN'ın hesap alanında geçiyor.`);
+        break;
+      }
+    for (const ba of sdm.bankaAnahtarlari) {
+      const [banka, sube] = ba.split("-");
+      if (!banka || !sube || !p) continue;
+      const bankaUyum = p.bankaKodu.endsWith(banka.replace(/^0+/, "") || "0");
+      const subeUyum = p.hesapAlani.includes(sube);
+      if (bankaUyum && subeUyum)
+        push("ok", "Banka anahtarı ↔ IBAN", `Banka anahtarı <span class="mono">${ba}</span> (${p.bankaAdi}) IBAN ile tutarlı.`);
+      else if (!bankaUyum)
+        push("fail", "Banka anahtarı ↔ IBAN", `Banka anahtarı <span class="mono">${ba}</span>, IBAN'daki banka kodu <span class="mono">${p.bankaKodu}</span> ile UYUŞMUYOR.`);
+      else
+        push("warn", "Banka anahtarı ↔ IBAN", `Şube kodu <span class="mono">${sube}</span> IBAN hesap alanında görünmüyor — şube kontrolü yapın.`);
+    }
+  }
+
+  const sdmSet = new Set(tumIbanlar);
+  for (const b of belgeler) {
+    const fark = b.ibanlar.filter(i => !sdmSet.has(i));
+    if (fark.length)
+      push("warn", "Belgede ek IBAN", `${b.kaynak}: SDM'de olmayan IBAN(lar): ` +
+        fark.map(i => `<span class="mono">${fmtIban(i)}</span>`).join(", ") + " — farklı para birimi hesabı olabilir.");
+  }
+
+  const belgePb = new Set(belgeler.flatMap(b => b.paraBirimleri));
+  for (const pb of sdm.paraBirimleri) {
+    const es = belgePb.has(pb) || (pb === "TRY" && belgePb.has("TL")) || (pb === "TL" && belgePb.has("TRY"));
+    push(es ? "ok" : "warn", "Para birimi", `SDM para birimi ${pb}` + (es ? " belgelerde de geçiyor." : " belgelerde görünmüyor!"));
+  }
+
+  const belgeVkn = uniq(belgeler.flatMap(b => b.vergiNo));
+  if (sdm.vergiNo.length && belgeVkn.length) {
+    for (const v of sdm.vergiNo.slice(0, 2))
+      push(belgeVkn.includes(v) ? "ok" : "fail", "Vergi no",
+        `VKN <span class="mono">${v}</span>` + (belgeVkn.includes(v) ? " belgelerle eşleşiyor."
+          : ` belgelerdeki VKN'lerle (<span class="mono">${belgeVkn.join(", ")}</span>) EŞLEŞMİYOR.`));
+  } else if (belgeVkn.length === 1) {
+    push("ok", "Vergi no", `Belgelerde tek tutarlı VKN: <span class="mono">${belgeVkn[0]}</span>. (SDM tarafında VKN okunamadı.)`);
+  } else if (belgeVkn.length > 1) {
+    push("warn", "Vergi no", `Belgelerde birden fazla VKN adayı: <span class="mono">${belgeVkn.join(", ")}</span> — kontrol edin.`);
+  }
+
+  const belgeUnvanlar = belgeler.flatMap(b => b.unvanlar.map(u => ({ u, k: b.kaynak })));
+  if (sdm.unvanlar.length && belgeUnvanlar.length) {
+    for (const u of sdm.unvanlar.slice(0, 2)) {
+      let best = null, skor = 0;
+      for (const { u: bu, k } of belgeUnvanlar) { const s = sim(u, bu); if (s > skor) { skor = s; best = { bu, k }; } }
+      if (best && skor >= 0.6)
+        push("ok", "Unvan", `"${u}" ↔ "${best.bu}" (${best.k}) benzerlik %${Math.round(skor * 100)}.`);
+      else if (best)
+        push("warn", "Unvan", `"${u}" belgelerdeki unvanlarla tam eşleşmiyor (en yakın: "${best.bu}", %${Math.round(skor * 100)}) — kısaltma/yazım farkı olabilir, göz kontrolü yapın.`);
+    }
+  } else if (belgeUnvanlar.length) {
+    push("warn", "Unvan", `SDM tarafında unvan okunamadı. Belgelerdeki hesap sahibi: ${belgeUnvanlar[0].u}`);
+  }
+  return B;
+}
+
+/* ============================= akış / arayüz ============================= */
+const $ = id => document.getElementById(id);
+const setNote = (t, err) => { const n = $("statusNote"); n.textContent = t || ""; n.classList.toggle("err", !!err); };
+function progress(label) {
+  const li = document.createElement("li");
+  li.textContent = label; li.className = "active";
+  $("progressList").append(li); $("progress").classList.add("show");
+  return {
+    set(t) { li.textContent = label + " — " + t; },
+    done(suffix) { li.className = "done"; li.textContent = "✓ " + label + (suffix ? " — " + suffix : ""); },
+    fail(msg) { li.className = ""; li.textContent = "✕ " + label + (msg ? " — " + msg : ""); }
+  };
+}
+
+$("btnStop").onclick = () => { state.cancelled = true; setNote("Durduruluyor…"); };
+
+$("btnRun").onclick = async () => {
+  if (state.running) return;
+  if (!state.docFiles.length) { setNote("En az bir tedarikçi belgesi (PDF/görüntü) yükleyin.", true); return; }
+  if (!state.ssFiles.length) { setNote("SDM ekran görüntüsü yükleyin.", true); return; }
+
+  state.running = true; state.cancelled = false;
+  $("btnRun").disabled = true; $("btnStop").hidden = false; setNote("");
+  $("progressList").replaceChildren(); $("results").classList.remove("show");
+
+  try {
+    await getWorker(t => setNote(t));
+    setNote("");
+
+    /* ---- SDM tarafı ---- */
+    let sdmMetin = "";
+    for (const f of state.ssFiles) {
+      if (state.cancelled) throw { code: "cancelled" };
+      const p = progress("SDM: " + f.name);
+      try {
+        sdmMetin += "\n" + await ocr(await fileToCanvas(f));
+        p.done();
+      } catch (e) { if (e?.code === "cancelled") throw e; p.fail("okunamadı"); }
+    }
+    const bol = sdmBolumle(sdmMetin);
+    const sdm = {
+      talepNo: findTalepNo(sdmMetin),
+      guncelIbanlar: bol.guncel,
+      yeniIbanlar: bol.yeni,
+      hesapNo: findHesapNo(sdmMetin, [...bol.guncel, ...bol.yeni]),
+      bankaAnahtarlari: findAnahtar(sdmMetin),
+      paraBirimleri: findPb(sdmMetin),
+      vergiNo: findVkn(sdmMetin).slice(0, 2),
+      unvanlar: findUnvan(sdmMetin)
+    };
+
+    /* ---- belgeler ---- */
+    const belgeler = [];
+    for (const f of state.docFiles) {
+      if (state.cancelled) throw { code: "cancelled" };
+      const p = progress(f.name);
+      try {
+        const metin = f.type === "application/pdf"
+          ? await pdfToText(f, t => p.set(t))
+          : await ocr(await fileToCanvas(f));
+        const b = alanlariCikar(metin, f.name);
+        belgeler.push(b);
+        p.done(b.ibanlar.length + " IBAN, " + b.vergiNo.length + " VKN");
+      } catch (e) {
+        if (e?.code === "cancelled") throw e;
+        p.fail("okunamadı — dosyayı kontrol edin");
+      }
+    }
+    if (!belgeler.length) throw { code: "no_docs", message: "Hiçbir belge okunamadı." };
+
+    render(sdm, belgeler, karsilastir(sdm, belgeler));
+  } catch (e) {
+    setNote(e?.code === "cancelled" ? "Durduruldu." : (e?.message || "Beklenmeyen bir hata oluştu."), e?.code !== "cancelled");
+  } finally {
+    state.running = false; $("btnRun").disabled = false; $("btnStop").hidden = true;
+  }
+};
+
+/* ============================== sonuç çizimi ============================= */
+function render(sdm, belgeler, bulgular) {
+  const nOk = bulgular.filter(b => b.durum === "ok").length;
+  const nWarn = bulgular.filter(b => b.durum === "warn").length;
+  const nFail = bulgular.filter(b => b.durum === "fail").length;
+  $("nOk").textContent = nOk; $("nWarn").textContent = nWarn; $("nFail").textContent = nFail;
+  $("nTalep").textContent = sdm.talepNo || "—";
+
+  const stamp = $("stamp");
+  if (nFail) {
+    stamp.className = "stamp fail"; $("stampText").textContent = "UYUMSUZ";
+    $("verdictText").innerHTML = "<b>Uyumsuzluk bulundu.</b> Talebi onaylamadan önce aşağıdaki farkları inceleyin.";
+  } else if (nWarn) {
+    stamp.className = "stamp warn"; $("stampText").textContent = "KONTROL";
+    $("verdictText").innerHTML = "<b>Kontrol önerilir.</b> Bazı alanlar tek kaynaktan teyitli ya da okunamadı.";
+  } else {
+    stamp.className = "stamp"; $("stampText").textContent = "UYUMLU";
+    $("verdictText").innerHTML = "<b>Tüm kontroller uyumlu görünüyor.</b>";
+  }
+  $("verdictSub").textContent = belgeler.length + " belge · " + bulgular.length + " kontrol · " +
+    new Date().toLocaleString("tr-TR");
+
+  const etiket = { ok: "UYUMLU", warn: "KONTROL", fail: "UYUMSUZ" };
+  $("findings").replaceChildren(...bulgular.map(b => {
+    const d = document.createElement("div"); d.className = "finding " + b.durum;
+    const tag = document.createElement("span"); tag.className = "tag"; tag.textContent = etiket[b.durum];
+    const body = document.createElement("div"); body.className = "body";
+    body.innerHTML = `<span class="k">${b.kontrol}.</span> ${b.detay}`;
+    d.append(tag, body); return d;
+  }));
+
+  const tumB = {
+    iban: uniq(belgeler.flatMap(b => b.ibanlar)),
+    vkn: uniq(belgeler.flatMap(b => b.vergiNo)),
+    pb: uniq(belgeler.flatMap(b => b.paraBirimleri)),
+    unvan: uniq(belgeler.flatMap(b => b.unvanlar))
+  };
+  const sdmIbanlar = uniq([...sdm.guncelIbanlar.map(i => fmtIban(i) + "  (mevcut)"), ...sdm.yeniIbanlar.map(i => fmtIban(i) + "  (yeni)")]);
+  const rows = [
+    ["IBAN", sdmIbanlar.join("\n"), tumB.iban.map(fmtIban).join("\n")],
+    ["Hesap no", sdm.hesapNo.slice(0, 4).join(", "), ""],
+    ["Banka anahtarı", sdm.bankaAnahtarlari.join(", "), ""],
+    ["Para birimi", sdm.paraBirimleri.join(", "), tumB.pb.join(", ")],
+    ["Vergi no", sdm.vergiNo.join(", "), tumB.vkn.join(", ")],
+    ["Unvan", sdm.unvanlar[0] || "", tumB.unvan[0] || ""]
+  ];
+  const tb = $("fieldTable").tBodies[0]; tb.replaceChildren();
+  for (const [alan, a, b] of rows) {
+    const tr = tb.insertRow();
+    const c0 = tr.insertCell(); c0.textContent = alan; c0.className = "alan";
+    const c1 = tr.insertCell(); const c2 = tr.insertCell();
+    c1.className = c2.className = "mono"; c1.style.whiteSpace = c2.style.whiteSpace = "pre-line";
+    c1.textContent = a || "—"; c2.textContent = b || "—";
+  }
+
+  $("docDetails").replaceChildren(...belgeler.map((b, ix) => {
+    const det = document.createElement("details"); det.className = "doc";
+    const sum = document.createElement("summary");
+    sum.innerHTML = `${b.kaynak} <span class="m">${b.ibanlar.length} IBAN · ${b.vergiNo.length} VKN</span>`;
+    const inner = document.createElement("div"); inner.className = "inner";
+    const dl = document.createElement("dl"); dl.className = "kv";
+    const add = (k, val) => { if (!val) return; const dt = document.createElement("dt"); dt.textContent = k;
+      const dd = document.createElement("dd"); dd.innerHTML = val; dl.append(dt, dd); };
+    add("IBAN'lar", b.ibanlar.map(i => {
+      const p = ibanParse(i);
+      return `<span class="mono">${fmtIban(i)}</span> — ${p?.bankaAdi || "?"} · mod-97 ${p?.gecerli ? "geçerli" : "GEÇERSİZ"}`;
+    }).join("<br>"));
+    add("Vergi no", b.vergiNo.map(v => `<span class="mono">${v}</span>`).join(", "));
+    add("Unvanlar", b.unvanlar.join("<br>"));
+    const dt = document.createElement("dt"); dt.textContent = "OCR / metin çıktısı";
+    const dd = document.createElement("dd");
+    const ta = document.createElement("textarea"); ta.readOnly = true; ta.value = b.metin.trim();
+    dd.append(ta); dl.append(dt, dd);
+    inner.append(dl); det.append(sum, inner); return det;
+  }));
+
+  const strip = h => h.replace(/<[^>]+>/g, "");
+  const rapor = "SDM KONTROL RAPORU — Talep No: " + (sdm.talepNo || "—") + "\n" +
+    "Tarih: " + new Date().toLocaleString("tr-TR") + "\n" + "=".repeat(52) + "\n" +
+    bulgular.map(b => `[${etiket[b.durum]}] ${b.kontrol}: ${strip(b.detay)}`).join("\n") + "\n";
+  if (reportUrl) URL.revokeObjectURL(reportUrl);
+  reportUrl = URL.createObjectURL(new Blob([rapor], { type: "text/plain;charset=utf-8" }));
+  const a = $("btnReport");
+  a.href = reportUrl;
+  a.download = "sdm_kontrol_" + (sdm.talepNo || "rapor") + ".txt";
+  a.hidden = false;
+
+  $("results").classList.add("show");
+  $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+</script>
+</body>
+</html>
