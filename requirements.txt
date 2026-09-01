@@ -1,5 +1,7 @@
 streamlit
 pandas
-pymupdf
-rapidocr-onnxruntime
+pymupdf==1.28.2
+rapidocr-onnxruntime==1.4.4
+onnxruntime==1.29.0
+opencv-python==5.0.0.93
 pillow
